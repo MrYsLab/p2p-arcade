@@ -1,6 +1,8 @@
 # p2p-arcade
 ## THIS IS A WORK IN PROGRESS 
-## DOCUMENTATION IS NOT YET COMPLETE
+## DOCUMENTATION IS NOT YET COMPLETE - WILL BE AVAILABLE SOON
+
+## Beware - this is alpha level!
 ![](./documentation/images/p2p_arcade.png)
 
 
