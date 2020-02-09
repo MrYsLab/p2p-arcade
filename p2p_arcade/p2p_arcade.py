@@ -143,7 +143,7 @@ class MyGame(arcade.Window, threading.Thread, BanyanBase):
 
         # initialize the python-banyan base class parent
         BanyanBase.__init__(self, back_plane_ip_address=back_plane_ip_address,
-                            process_name=process_name, loop_time=.001)
+                            process_name=process_name, loop_time=.00001)
 
         # add banyan subscription topics
         self.set_subscriber_topic('update_coins')
@@ -294,7 +294,7 @@ class MyGame(arcade.Window, threading.Thread, BanyanBase):
 
         """
         # start the banyan loop - incoming messages will be processed
-        # by incoming_message_processing in this thread.
+        # by incoming_message_processing in tghis thread.
         self.receive_loop()
 
     def incoming_message_processing(self, topic, payload):
