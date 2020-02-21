@@ -3,12 +3,13 @@
  https://github.com/pvcraven/arcade/blob/master/arcade/examples/sprite_collect_coins_move_bouncing.py
 
  This program demonstrates using arcade in a peer to peer configuration, across
- 2 computers. It takes advantage of python-banyan to provide distributed computing support.
+ 2 computers or 2 processes. It takes advantage of python-banyan to provide
+ distributed computing support.
  https://github.com/MrYsLab/python_banyan
 
  Copyright (c) 2020 Alan Yorinks All right reserved.
 
- Python Banyan is free software; you can redistribute it and/or
+ p2p_arcade is free software; you can redistribute it and/or
  modify it under the terms of the GNU AFFERO GENERAL PUBLIC LICENSE
  Version 3 as published by the Free Software Foundation; either
  or (at your option) any later version.
@@ -26,21 +27,22 @@
 Artwork from http://kenney.nl
 
 """
-import arcade
 import argparse
-import psutil
-from python_banyan.banyan_base import BanyanBase
 import random
 import signal
-import sys
 import subprocess
+import sys
 import threading
+import time
+
+import arcade
+import psutil
+from python_banyan.banyan_base import BanyanBase
 
 # --- Constants ---
 SPRITE_SCALING_PLAYER = 0.5
 SPRITE_SCALING_COIN = 0.2
 COIN_COUNT = 50
-
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
 SCREEN_TITLE = "Arcade P2P Example Player"
@@ -59,7 +61,16 @@ class Coin(arcade.Sprite):
 
         # Assign an index number to each coin
         # so that we can track coins across game instances.
-        self.my_index = None
+        # We establish this as a property in the methods below.
+        self._my_index = None
+
+    @property
+    def my_index(self):
+        return self._my_index
+
+    @my_index.setter
+    def my_index(self, index):
+        self._my_index = index
 
     def update(self):
         """
@@ -69,7 +80,7 @@ class Coin(arcade.Sprite):
         return
 
 
-# noinspection PyMethodMayBeStatic
+# noinspection DuplicatedCode,PyMethodMayBeStatic,DuplicatedCode,PyPep8
 class MyGame(arcade.Window, threading.Thread, BanyanBase):
     """
     This class creates a gaming instance to support p2p
@@ -78,13 +89,12 @@ class MyGame(arcade.Window, threading.Thread, BanyanBase):
     The game has 2 "players". Player 0 are the coins and
     player 1 is the female person sprite.
 
-    To run the game, first make sure the backplane is running.
-    Next start an instance of the game with no command line parameters.
-    Finally start the second instance of the game with the -p 1 command
+    Start one instance of the game with no command line parameters and
+    then start a second instance of the game with the -p 1 command
     line option.
 
     If you are running the game across multiple computers, add the -b option
-    with the IP address of the backplane to the second instance.
+    with the IP address of player 0's computer when instantiating player 1.
     """
 
     def __init__(self, back_plane_ip_address=None,
@@ -115,6 +125,10 @@ class MyGame(arcade.Window, threading.Thread, BanyanBase):
         # Don't show the mouse cursor
         self.set_mouse_visible(False)
 
+        # flag to start coin movement - change flag state
+        # by pressing the left mouse button
+        self.go = False
+
         # initially turn collision detection off.
         # pressing the right mouse button will enable it.
         self.run_collision_detection = False
@@ -141,21 +155,25 @@ class MyGame(arcade.Window, threading.Thread, BanyanBase):
         if not back_plane_ip_address:
             self.start_backplane()
 
-        # initialize the python-banyan base class parent
+        # initialize the python-banyan base class parent.
+        # if the backplane_ip_address is == None, then the local IP
+        # address is used.
+        # The process name is just informational for the Banyan header
+        # printed on the console.
+        # The loop_time the amount of idle time in seconds for the
+        # banyan receive_loop to wait to check for the next message
+        # available in its queue.
         BanyanBase.__init__(self, back_plane_ip_address=back_plane_ip_address,
-                            process_name=process_name, loop_time=.00001)
+                            process_name=process_name, loop_time=.0001)
 
         # add banyan subscription topics
-        self.set_subscriber_topic('update_coins')
+        self.set_subscriber_topic('enable_coins')
+        self.set_subscriber_topic('enable_collisions')
         self.set_subscriber_topic('p1_move')
-        self.set_subscriber_topic('bump_score')
+        self.set_subscriber_topic('update_coins')
         self.set_subscriber_topic('remove_coin')
 
         arcade.set_background_color(arcade.color.AMAZON)
-
-        # flag to start coin movement - change flag state
-        # by pressing the left mouse button
-        self.go = False
 
         # initialize some things
         self.setup()
@@ -172,7 +190,6 @@ class MyGame(arcade.Window, threading.Thread, BanyanBase):
             # we are outta here!
             sys.exit(0)
 
-    # noinspection DuplicatedCode
     def setup(self):
         """
         Initialize the game
@@ -190,7 +207,7 @@ class MyGame(arcade.Window, threading.Thread, BanyanBase):
         self.all_sprites_list.append(self.player_sprite)
 
         # Create the coins which constitute player 2
-        for i in range(50):
+        for i in range(COIN_COUNT):
             # Create the coin instance
             # Coin image from kenney.nl
             coin = Coin(":resources:images/items/coinGold.png", SPRITE_SCALING_COIN)
@@ -200,6 +217,8 @@ class MyGame(arcade.Window, threading.Thread, BanyanBase):
             coin.center_y = random.randrange(SCREEN_HEIGHT)
             coin.change_x = random.randrange(-3, 4)
             coin.change_y = random.randrange(-3, 4)
+
+            # add the index number to each coin
             coin.my_index = i
 
             # Add the coin to the lists
@@ -234,11 +253,15 @@ class MyGame(arcade.Window, threading.Thread, BanyanBase):
     def on_mouse_press(self, x, y, button, modifiers):
         # start the coins in motion
         if button == arcade.MOUSE_BUTTON_LEFT:
-            self.go = True
+            payload = {'go': True}
+            self.publish_payload(payload, 'enable_coins')
 
-        # start collision detection
-        if button == arcade.MOUSE_BUTTON_RIGHT:
-            self.run_collision_detection = True
+        # start collision detection if we've started the coins in motion
+        if self.go:
+            if button == arcade.MOUSE_BUTTON_RIGHT:
+                # self.run_collision_detection = True
+                payload = {'collision': True}
+                self.publish_payload(payload, 'enable_collisions')
 
     def on_update(self, delta_time):
         """
@@ -246,20 +269,22 @@ class MyGame(arcade.Window, threading.Thread, BanyanBase):
         :param delta_time:
         """
 
-        # Call update on all sprites (The sprites don't do much in this
-        # example though.)
+        # update the female collection sprite.
         self.all_sprites_list.update()
 
+        # If we started the coins in motion, and this is the "coin" player,
+        # gather all the current positions of the coins in the coin_list.
         if self.go:
-            # build a list of all the coin positions using a list comprehension.
-            # publish this list with the updated coin positions.
-            with self.the_lock:
-                coin_updates = [[self.coin_list.sprite_list[i].center_x,
-                                 self.coin_list.sprite_list[i].center_y] for i in range(len(self.coin_list))]
-                payload = {'updates': coin_updates}
+            if self.player == 0:
+                # build a list of all the coin positions using a list comprehension.
+                # publish this list with the updated coin positions.
+                with self.the_lock:
+                    coin_updates = [[self.coin_list.sprite_list[i].center_x,
+                                     self.coin_list.sprite_list[i].center_y] for i in range(len(self.coin_list))]
+                    payload = {'updates': coin_updates}
+                    self.publish_payload(payload, 'update_coins')
 
-                self.publish_payload(payload, 'update_coins')
-
+    # noinspection PyPep8
     def start_backplane(self):
         """
         Start the backplane
@@ -287,14 +312,14 @@ class MyGame(arcade.Window, threading.Thread, BanyanBase):
     # Process banyan subscribed messages
     def run(self):
         """
-        This is thread continually attempts to receive
+        This thread continually attempts to receive
         incoming Banyan messages. If a message is received,
         incoming_message_processing is called to handle
         the message.
 
         """
         # start the banyan loop - incoming messages will be processed
-        # by incoming_message_processing in tghis thread.
+        # by incoming_message_processing in this thread.
         self.receive_loop()
 
     def incoming_message_processing(self, topic, payload):
@@ -335,29 +360,27 @@ class MyGame(arcade.Window, threading.Thread, BanyanBase):
                                 self.coin_list.sprite_list[i].change_y *= -1
                         # this should not happen, but if it does,
                         # just ignore and go along our merry way.
-
                         except (TypeError, IndexError):
                             continue
 
                 # perform hit detection if enabled with the right mouse button.
-                if self.run_collision_detection:
-                    hit_list = arcade.check_for_collision_with_list(self.player_sprite,
-                                                                    self.coin_list)
-                    # hit detected
-                    if hit_list:
-                        for coin in hit_list:
-                            # publish a remove_coin message using the coin
-                            # index as the payload. The index is necessary
-                            # so that we can remove coins for both players.
-                            coin_index = coin.my_index
-                            payload = {'coin': coin_index}
-                            self.publish_payload(payload, 'remove_coin')
+                with self.the_lock:
+                    if self.run_collision_detection:
+                        hit_list = arcade.check_for_collision_with_list(self.player_sprite,
+                                                                        self.coin_list)
+                        # hit detected
+                        if hit_list:
+                            for coin in hit_list:
+                                # publish a remove_coin message using the coin
+                                # index as the payload. The index is necessary
+                                # so that we can remove coins for both players.
+                                coin_index = coin.my_index
+                                payload = {'coin': coin_index}
+                                self.publish_payload(payload, 'remove_coin')
+                                # allow time for the message to be published cleanly
+                                time.sleep(.0001)
 
-                            # bump up the score by publishing a bump_score
-                            # message
-                            payload = {'bump': 1}
-                            self.publish_payload(payload, 'bump_score')
-            # move player 2 on the screen
+            # move player `1` on the screen
             elif topic == 'p1_move':
                 self.player_sprite.center_x = payload['p1_x']
                 self.player_sprite.center_y = payload['p1_y']
@@ -369,9 +392,11 @@ class MyGame(arcade.Window, threading.Thread, BanyanBase):
                     for coin in self.coin_list.sprite_list:
                         if coin_index == coin.my_index:
                             coin.remove_from_sprite_lists()
-            # bump the score variable.
-            elif topic == 'bump_score':
-                self.score += 1
+                            self.score += 1
+            elif topic == 'enable_coins':
+                self.go = True
+            elif topic == 'enable_collisions':
+                self.run_collision_detection = True
 
 
 def p2p_arcade():
@@ -399,7 +424,7 @@ def p2p_arcade():
 
 
 # signal handler function called when Control-C occurs
-# noinspection PyShadowingNames,PyUnusedLocal,PyUnusedLocal
+# noinspection PyUnusedLocal,PyUnusedLocal
 def signal_handler(sig, frame):
     print('Exiting Through Signal Handler')
     raise KeyboardInterrupt

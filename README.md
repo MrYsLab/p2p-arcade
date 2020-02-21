@@ -1,8 +1,10 @@
 # p2p-arcade
-## THIS IS A WORK IN PROGRESS 
-## DOCUMENTATION IS NOT YET COMPLETE - WILL BE AVAILABLE SOON
 
-## Beware - this is alpha level!
+## Create Peer To Peer Games With [Arcade](https://arcade.academy/) And [Python Banyan](https://mryslab.github.io/python_banyan/)
+
+### Check Out The [Tutorial](https://mryslab.github.io/bots-in-pieces/python-banyan/arcade/2020/02/21/p2p-arcade-1.html)
+
+
 ![](./documentation/images/p2p_arcade.png)
 
 
@@ -63,4 +65,9 @@ Use the IP address noted when opening the first window:
 
 ```
 p2pa -p 1 -b 192.168.2.192
+```
+
+This project was developed with
+[Pycharm](https://www.jetbrains.com/pycharm/?from=p2p-arcade)
+![logo](https://github.com/MrYsLab/python_banyan/blob/master/images/icon_PyCharm.png)
 

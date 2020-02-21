@@ -5,7 +5,7 @@ with open('pypi_desc.md') as f:
 
 setup(
     name='p2p_arcade',
-    version='0.1',
+    version='0.2',
     packages=[
         'p2p_arcade',
     ],
@@ -28,7 +28,7 @@ setup(
     long_description_content_type='text/markdown',
     keywords=['arcade',  'p2p', 'games', 'arcade',],
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'Environment :: Other Environment',
         'Intended Audience :: Education',
         'Intended Audience :: Developers',
